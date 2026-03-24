@@ -1,2 +1,9 @@
+# Visualization
 matplotlib>=3.8
 numpy>=1.24
+
+# Agent loop (01) — works with any OpenAI-compatible endpoint
+openai>=1.0
+
+# Hybrid router (02) — frontier backend
+anthropic>=0.40

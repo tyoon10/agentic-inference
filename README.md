@@ -4,47 +4,85 @@ Exploring the agentic AI inference stack — from open-weight models to self-hos
 
 Companion repo to [Agents Don't Need Better Models. They Need Better Infrastructure.](https://twyoon.com/post/agents-need-better-infrastructure/)
 
-## Visualizations
-
-Publication-quality figures of the post-GTC 2026 NVIDIA AI stack.
+## Quickstart
 
 ```bash
 pip install -r requirements.txt
+```
 
+### Visualizations
+
+Four publication-quality figures generated from code:
+
+```bash
 python -m viz.stack                    # three-layer architecture diagram
 python -m viz.cost                     # API vs self-hosted cost crossover
-python -m viz.stack --out figures/     # custom output directory
+python -m viz.trace                    # agent loop execution trace
+python -m viz.routing                  # hybrid routing decisions scatter
 ```
+
+All accept `--out path/` for custom output directory.
 
 | Figure | What it shows |
 |--------|---------------|
 | `stack` | Governance → Serving → Models with hybrid routing arrows |
 | `cost` | Monthly cost crossover at ~5,500 agent calls/day |
+| `trace` | Step-by-step agent loop: model → tool call → result → answer |
+| `routing` | Tasks plotted by complexity, colored by local vs frontier backend |
+
+### Run the demos (requires API keys)
+
+```bash
+export MISTRAL_API_KEY=your_key
+export ANTHROPIC_API_KEY=your_key
+
+# 01 — Agent loop on Mistral Small 4
+python projects/01_tool_calling/demo.py
+
+# 02 — Hybrid router: Mistral (local) + Claude (frontier)
+python projects/02_hybrid_router/demo.py --threshold 0.6
+```
+
+Both demos run the real agent/router, save trace data as JSON, and auto-generate visualizations.
 
 ## Projects
 
 Mini projects showcasing [Mistral Small 4](https://huggingface.co/mistralai/Mistral-Small-4-119B-2603) (119B, agentic tool-calling, open weights) on the NVIDIA inference stack.
 
-### 01 — Tool-Calling Agent Loop
+### 01 — Tool-Calling Agent Loop ✅
 
 > **The core pattern.** A `while(tool_use)` agent loop running entirely on Mistral Small 4.
 
 The model decides which tools to call and when to stop — no hardcoded step sequence. Demonstrates that open-weight models can drive autonomous tool-calling loops, not just answer questions.
 
-- Run locally via [vLLM](https://github.com/vllm-project/vllm) or [NIM](https://build.nvidia.com/)
-- Tools: file reader, web fetcher, calculator
-- Compare: latency and tool-selection accuracy vs Claude Sonnet on the same tasks
+```
+projects/01_tool_calling/
+  agent.py    — Agent class: while(tool_use) loop with trace capture
+  tools.py    — ToolRegistry + 5 built-in tools (calculator, file read, etc.)
+  demo.py     — Run agent → save trace JSON → render viz
+```
 
-### 02 — Hybrid Router
+- Works with any OpenAI-compatible endpoint: NIM, vLLM, Mistral API
+- Auto-generates tool schemas from Python type hints
+- Full trace capture: tokens, latency, tool calls per turn
+- Visualization: `viz/trace.py` renders the execution as a vertical flow diagram
 
-> **Route by complexity.** Easy calls → self-hosted Mistral. Hard calls → frontier API.
+### 02 — Hybrid Router ✅
+
+> **Route by complexity.** Easy calls → self-hosted Mistral. Hard calls → frontier API (Claude).
 
 A lightweight routing layer that classifies incoming requests and dispatches them to the right backend. The same architecture described in the blog article — and the same pattern NVIDIA's OpenShell Privacy Router implements at the infrastructure level.
 
+```
+projects/02_hybrid_router/
+  router.py   — HybridRouter: classify → route → complete, with stats
+  demo.py     — Run 15 sample tasks → save decisions JSON → render viz
+```
+
 - Classifier: Mistral Small 4 scores task complexity (0–1) in a single call
 - Threshold routing: below 0.6 → local Mistral, above → Claude API
-- Measure: cost savings vs quality tradeoff at different thresholds
-- Log every decision for analysis
+- Aggregate stats: local %, avg latency, tokens per backend
+- Visualization: `viz/routing.py` plots decisions as a scatter with threshold line
 
 ### 03 — Job Scanner on Open Stack
 
@@ -52,7 +90,7 @@ A lightweight routing layer that classifies incoming requests and dispatches the
 
 The [career monitor](https://twyoon.com/post/agents-need-better-infrastructure/) from the blog article currently runs on Claude's API — 345 calls/day across 23 companies. Port the two-stage screening pipeline (title filter → JD keyword classification) to Mistral Small 4 on NIM.
 
-- Stage 1 (title classification): should match or exceed API accuracy — it's a simple classification task
+- Stage 1 (title classification): should match or exceed API accuracy
 - Stage 2 (JD analysis): test whether 119B parameters handle nuanced keyword matching
 - Benchmark: accuracy parity, latency difference, cost difference over 30 days
 
@@ -60,17 +98,11 @@ The [career monitor](https://twyoon.com/post/agents-need-better-infrastructure/)
 
 > **Measure what the article claims.** Fan-out, chaining, and iterative loops — benchmarked.
 
-Run the three agent inference patterns from the blog against both API and self-hosted backends. Quantify latency, throughput, and cost for each.
-
 | Pattern | Workload | What to measure |
 |---------|----------|-----------------|
 | Parallel fan-out | 23 concurrent classification calls | Throughput ceiling, rate limit impact |
 | Sequential chain | 4-step transcript → summary → actions → push | End-to-end latency |
 | Iterative loop | 3-pass draft → evaluate → revise | Token cost scaling, context growth |
-
-- Self-hosted: vLLM + Mistral Small 4 on a single A100
-- API: Claude Sonnet via Anthropic API
-- Output: comparison table + visualization (extend `viz/`)
 
 ### 05 — Devstral Code Agent
 
@@ -78,9 +110,23 @@ Run the three agent inference patterns from the blog against both API and self-h
 
 Build a minimal code agent that reads a file, identifies issues, proposes fixes, and applies them — the same loop Claude Code and Codex run, but on a self-hosted model.
 
-- Use Devstral's native tool-calling for file read/write/search
-- Test on real tasks: bug fixes, refactors, test generation
-- Compare: fix quality and autonomy vs Claude Code on the same tasks
+## Structure
+
+```
+agentic-inference/
+  viz/                          # Visualization modules (matplotlib, dark theme)
+    theme.py                    # Shared NVIDIA-green palette
+    stack.py                    # Three-layer architecture diagram
+    cost.py                     # API vs self-hosted cost crossover
+    trace.py                    # Agent loop execution trace
+    routing.py                  # Hybrid routing decisions scatter
+  projects/
+    01_tool_calling/            # ✅ Agent loop + tool registry
+    02_hybrid_router/           # ✅ Complexity-based routing
+    03_job_scanner/             # Port career monitor to open stack
+    04_inference_benchmarks/    # Benchmark fan-out, chain, loop
+    05_devstral_code_agent/     # Code agent on Devstral
+```
 
 ## Stack Reference
 
