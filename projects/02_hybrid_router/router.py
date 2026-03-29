@@ -119,7 +119,7 @@ class HybridRouter:
         local_base_url: str | None = None,
         local_api_key: str | None = None,
         local_model: str = "mistral-small-latest",
-        frontier_model: str = "claude-sonnet-4-20250514",
+        frontier_model: str = "claude-sonnet-4-6",
         frontier_api_key: str | None = None,
         threshold: float = 0.6,
     ):
