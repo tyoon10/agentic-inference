@@ -7,3 +7,5 @@ openai>=1.0
 
 # Hybrid router (02) — frontier backend
 anthropic>=0.40
+
+# News aggregator (03) — no extra deps (uses stdlib urllib + xml.etree)

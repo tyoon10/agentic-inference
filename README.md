@@ -41,6 +41,9 @@ python projects/01_tool_calling/demo.py
 
 # 02 — Hybrid router: Mistral (local) + Claude (frontier)
 python projects/02_hybrid_router/demo.py --threshold 0.6
+
+# 03 — AI news aggregator (weekly digest)
+python projects/03_news_aggregator/demo.py --days 7
 ```
 
 Both demos run the real agent/router, save trace data as JSON, and auto-generate visualizations.
@@ -84,15 +87,23 @@ projects/02_hybrid_router/
 - Aggregate stats: local %, avg latency, tokens per backend
 - Visualization: `viz/routing.py` plots decisions as a scatter with threshold line
 
-### 03 — Job Scanner on Open Stack
+### 03 — AI News Aggregator ✅
 
-> **Port a real workflow from API to self-hosted.** Same logic, different infrastructure.
+> **Smart weekly digest.** An agent that fetches, filters, and summarizes the week's most significant AI news.
 
-The [career monitor](https://twyoon.com/post/agents-need-better-infrastructure/) from the blog article currently runs on Claude's API — 345 calls/day across 23 companies. Port the two-stage screening pipeline (title filter → JD keyword classification) to Mistral Small 4 on NIM.
+The agent autonomously crawls RSS feeds from 9 major AI sources (OpenAI, Google, Anthropic, NVIDIA, Mistral, DeepMind, HuggingFace, MIT Tech Review, arXiv), identifies the most impactful stories, fetches full article text for top picks, and compiles a ranked markdown digest.
 
-- Stage 1 (title classification): should match or exceed API accuracy
-- Stage 2 (JD analysis): test whether 119B parameters handle nuanced keyword matching
-- Benchmark: accuracy parity, latency difference, cost difference over 30 days
+```
+projects/03_news_aggregator/
+  news_tools.py — RSS fetching, article extraction, date filtering, digest saver
+  demo.py       — Run agent → fetch all feeds → produce weekly digest
+```
+
+- 9 built-in AI news sources (RSS/Atom)
+- Full article text extraction for deep summaries
+- Configurable lookback window (`--days 3`, `--days 14`)
+- Works with NIM, vLLM, or Mistral API — same OpenAI-compatible interface
+- Outputs ranked markdown digest + full agent trace
 
 ### 04 — Inference Pattern Benchmarks
 
@@ -123,7 +134,7 @@ agentic-inference/
   projects/
     01_tool_calling/            # ✅ Agent loop + tool registry
     02_hybrid_router/           # ✅ Complexity-based routing
-    03_job_scanner/             # Port career monitor to open stack
+    03_news_aggregator/         # ✅ AI news digest agent
     04_inference_benchmarks/    # Benchmark fan-out, chain, loop
     05_devstral_code_agent/     # Code agent on Devstral
 ```
