@@ -1,20 +1,21 @@
 """
 Demo: Run the hybrid router on sample tasks and visualize routing decisions.
 
-Requires MISTRAL_API_KEY and ANTHROPIC_API_KEY env vars.
+Both tiers run through the NVIDIA API catalog — one key, two model tiers.
+
+Requires NVIDIA_API_KEY env var.
 
 Usage:
-  export MISTRAL_API_KEY=your_key
-  export ANTHROPIC_API_KEY=your_key
+  export NVIDIA_API_KEY=your_key
 
   # Run with default tasks
-  python -m projects.02-hybrid-router.demo
+  python projects/02_hybrid_router/demo.py
 
   # Custom threshold
-  python -m projects.02-hybrid-router.demo --threshold 0.5
+  python projects/02_hybrid_router/demo.py --threshold 0.5
 
-  # Use local NIM/vLLM instead of Mistral API
-  python -m projects.02-hybrid-router.demo --local-url http://localhost:8000/v1
+  # Use local NIM/vLLM instead of NVIDIA cloud
+  python projects/02_hybrid_router/demo.py --base-url http://localhost:8000/v1
 """
 
 import argparse
@@ -32,7 +33,7 @@ from viz.routing import render as render_routing
 
 
 SAMPLE_TASKS = [
-    # Simple — should route local
+    # Simple — should route to fast tier (Nemotron)
     "Classify this email subject as spam or not spam: 'You won $1M click here'",
     "Extract the total amount from: 'Invoice #4521, Total: $2,340.00'",
     "What day of the week is July 4, 2026?",
@@ -41,7 +42,7 @@ SAMPLE_TASKS = [
     "Translate 'Good morning' to Spanish, French, and Japanese",
     "Summarize this in one sentence: 'The quarterly revenue was $4.2B, up 12% YoY'",
 
-    # Complex — should route frontier
+    # Complex — should route to frontier tier (Mistral Large 3)
     "Analyze the competitive positioning of Anthropic vs OpenAI vs Google in enterprise AI, considering pricing, model quality, safety approach, and developer experience",
     "Write a persuasive appeal letter for a denied health insurance claim for physical therapy after knee surgery, citing relevant policy clauses",
     "Design a migration plan from a Django monolith to a microservices architecture, considering data consistency, team structure, and phased rollout",
@@ -57,33 +58,29 @@ SAMPLE_TASKS = [
 def main():
     parser = argparse.ArgumentParser(description="Hybrid router demo")
     parser.add_argument("--threshold", type=float, default=0.6)
-    parser.add_argument("--local-model", default="mistral-small-latest")
-    parser.add_argument("--local-url", default="https://api.mistral.ai/v1")
-    parser.add_argument("--local-key", default=None)
-    parser.add_argument("--frontier-model", default="claude-sonnet-4-20250514")
+    parser.add_argument("--fast-model", default="mistralai/mistral-nemotron")
+    parser.add_argument("--frontier-model", default="mistralai/mistral-large-3-instruct-2512")
+    parser.add_argument("--base-url", default="https://integrate.api.nvidia.com/v1")
+    parser.add_argument("--api-key", default=None)
     parser.add_argument("--out", default="output")
     args = parser.parse_args()
 
-    local_key = args.local_key or os.environ.get("MISTRAL_API_KEY")
-    frontier_key = os.environ.get("ANTHROPIC_API_KEY")
-
-    if not local_key:
-        print("Error: Set MISTRAL_API_KEY env var or pass --local-key")
-        sys.exit(1)
-    if not frontier_key:
-        print("Error: Set ANTHROPIC_API_KEY env var")
+    api_key = args.api_key or os.environ.get("NVIDIA_API_KEY")
+    if not api_key:
+        print("Error: Set NVIDIA_API_KEY env var or pass --api-key")
         sys.exit(1)
 
-    print(f"Local:     {args.local_model} @ {args.local_url}")
+    print(f"Fast:      {args.fast_model}")
     print(f"Frontier:  {args.frontier_model}")
+    print(f"Endpoint:  {args.base_url}")
     print(f"Threshold: {args.threshold}")
     print(f"Tasks:     {len(SAMPLE_TASKS)}")
     print()
 
     router = HybridRouter(
-        local_base_url=args.local_url,
-        local_api_key=local_key,
-        local_model=args.local_model,
+        base_url=args.base_url,
+        api_key=api_key,
+        fast_model=args.fast_model,
         frontier_model=args.frontier_model,
         threshold=args.threshold,
     )
@@ -91,7 +88,7 @@ def main():
     for i, task in enumerate(SAMPLE_TASKS, 1):
         print(f"[{i:2d}/{len(SAMPLE_TASKS)}] ", end="", flush=True)
         decision = router.route(task)
-        icon = "🟠" if decision.backend == "local" else "🔵"
+        icon = "🟠" if decision.backend == "fast" else "🔵"
         print(f"{icon} {decision.complexity_score:.2f} → {decision.backend:8s} "
               f"({decision.total_ms:,.0f}ms)  {task[:60]}")
 
@@ -99,8 +96,8 @@ def main():
     stats = router.stats
     print(f"\n{'='*60}")
     print(f"Total:    {stats.total} tasks")
-    print(f"Local:    {stats.local_count} ({stats.local_pct:.0f}%)")
-    print(f"Frontier: {stats.frontier_count} ({100-stats.local_pct:.0f}%)")
+    print(f"Fast:     {stats.fast_count} ({stats.fast_pct:.0f}%)")
+    print(f"Frontier: {stats.frontier_count} ({100-stats.fast_pct:.0f}%)")
     print(f"Avg latency: {stats.avg_latency_ms:,.0f}ms")
 
     # Save and visualize

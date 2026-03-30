@@ -1,9 +1,12 @@
 """
-Hybrid Router — route agent calls between self-hosted and frontier APIs.
+Hybrid Router — route agent calls between fast and frontier model tiers.
 
-Classifies task complexity using the local model, then routes:
-  - Below threshold → self-hosted (Mistral Small 4 via NIM/vLLM)
-  - Above threshold → frontier API (Claude via Anthropic)
+Classifies task complexity using the fast model, then routes:
+  - Below threshold → Mistral Nemotron (12B, fast, cheap)
+  - Above threshold → Mistral Large 3 (675B MoE, complex reasoning)
+
+Both tiers served through the same NVIDIA API catalog
+(integrate.api.nvidia.com) — one key, one endpoint pattern.
 
 This is the same pattern NVIDIA's OpenShell Privacy Router implements
 at the infrastructure level — but here it's application-layer routing
@@ -13,12 +16,11 @@ Usage:
     from router import HybridRouter
 
     router = HybridRouter(
-        local_base_url="http://localhost:8000/v1",  # NIM or vLLM
-        local_model="mistral-small-latest",
-        frontier_model="claude-sonnet-4-20250514",
+        base_url="https://integrate.api.nvidia.com/v1",
+        api_key=NVIDIA_API_KEY,
     )
     result = router.route("Classify this email as spam or not spam")
-    print(result.backend)   # "local" or "frontier"
+    print(result.backend)   # "fast" or "frontier"
     print(result.answer)
 """
 
@@ -27,7 +29,6 @@ import os
 import time
 from dataclasses import dataclass, field
 
-import anthropic
 from openai import OpenAI
 
 
@@ -37,7 +38,7 @@ class RoutingDecision:
     task: str
     complexity_score: float
     threshold: float
-    backend: str                    # "local" or "frontier"
+    backend: str                    # "fast" or "frontier"
     answer: str
     classification_ms: float        # time to classify
     completion_ms: float            # time to generate answer
@@ -56,16 +57,16 @@ class RouterStats:
         return len(self.decisions)
 
     @property
-    def local_count(self) -> int:
-        return sum(1 for d in self.decisions if d.backend == "local")
+    def fast_count(self) -> int:
+        return sum(1 for d in self.decisions if d.backend == "fast")
 
     @property
     def frontier_count(self) -> int:
         return sum(1 for d in self.decisions if d.backend == "frontier")
 
     @property
-    def local_pct(self) -> float:
-        return (self.local_count / self.total * 100) if self.total else 0
+    def fast_pct(self) -> float:
+        return (self.fast_count / self.total * 100) if self.total else 0
 
     @property
     def avg_complexity(self) -> float:
@@ -85,7 +86,7 @@ class RouterStats:
             {
                 "task": d.task[:80],
                 "complexity": d.complexity_score,
-                "backend": d.backend,
+                "backend": "local" if d.backend == "fast" else "frontier",
                 "latency_ms": d.total_ms,
                 "tokens": d.input_tokens + d.output_tokens,
             }
@@ -107,44 +108,36 @@ Respond with ONLY a JSON object: {"score": <float>, "reason": "<one sentence>"}"
 
 class HybridRouter:
     """
-    Routes tasks between self-hosted and frontier models.
+    Routes tasks between fast and frontier model tiers.
 
-    The classifier runs on the local model (cheap, fast). Only tasks
-    above the complexity threshold get sent to the frontier API.
-    This means the routing overhead is one local inference call.
+    Both tiers use the same OpenAI-compatible API (NVIDIA catalog).
+    The classifier runs on the fast model (cheap, fast). Only tasks
+    above the complexity threshold get sent to the frontier model.
     """
 
     def __init__(
         self,
-        local_base_url: str | None = None,
-        local_api_key: str | None = None,
-        local_model: str = "mistral-small-latest",
-        frontier_model: str = "claude-sonnet-4-6",
-        frontier_api_key: str | None = None,
+        base_url: str = "https://integrate.api.nvidia.com/v1",
+        api_key: str | None = None,
+        fast_model: str = "mistralai/mistral-nemotron",
+        frontier_model: str = "mistralai/mistral-large-3-instruct-2512",
         threshold: float = 0.6,
     ):
         self.threshold = threshold
-        self.local_model = local_model
+        self.fast_model = fast_model
         self.frontier_model = frontier_model
         self.stats = RouterStats()
 
-        # Local client — OpenAI-compatible (NIM, vLLM, Mistral API)
-        local_kwargs = {}
-        if local_base_url:
-            local_kwargs["base_url"] = local_base_url
-        if local_api_key:
-            local_kwargs["api_key"] = local_api_key
-        self.local_client = OpenAI(**local_kwargs)
-
-        # Frontier client — Anthropic
-        self.frontier_client = anthropic.Anthropic(
-            api_key=frontier_api_key or os.environ.get("ANTHROPIC_API_KEY")
+        # Single client — both tiers go through the same API
+        self.client = OpenAI(
+            base_url=base_url,
+            api_key=api_key or os.environ.get("NVIDIA_API_KEY"),
         )
 
     def classify(self, task: str) -> tuple[float, str]:
-        """Score task complexity using the local model. Returns (score, reason)."""
-        response = self.local_client.chat.completions.create(
-            model=self.local_model,
+        """Score task complexity using the fast model. Returns (score, reason)."""
+        response = self.client.chat.completions.create(
+            model=self.fast_model,
             messages=[
                 {"role": "system", "content": CLASSIFIER_PROMPT},
                 {"role": "user", "content": task},
@@ -159,10 +152,10 @@ class HybridRouter:
         except (json.JSONDecodeError, ValueError):
             return 0.5, f"Parse error, raw: {text[:100]}"
 
-    def _complete_local(self, task: str) -> tuple[str, int, int]:
-        """Generate answer using local model."""
-        response = self.local_client.chat.completions.create(
-            model=self.local_model,
+    def _complete_fast(self, task: str) -> tuple[str, int, int]:
+        """Generate answer using fast model (Nemotron)."""
+        response = self.client.chat.completions.create(
+            model=self.fast_model,
             messages=[{"role": "user", "content": task}],
         )
         usage = response.usage
@@ -173,32 +166,32 @@ class HybridRouter:
         )
 
     def _complete_frontier(self, task: str) -> tuple[str, int, int]:
-        """Generate answer using frontier model (Claude)."""
-        response = self.frontier_client.messages.create(
+        """Generate answer using frontier model (Mistral Large 3)."""
+        response = self.client.chat.completions.create(
             model=self.frontier_model,
-            max_tokens=2048,
             messages=[{"role": "user", "content": task}],
         )
+        usage = response.usage
         return (
-            response.content[0].text if response.content else "",
-            response.usage.input_tokens,
-            response.usage.output_tokens,
+            response.choices[0].message.content or "",
+            usage.prompt_tokens if usage else 0,
+            usage.completion_tokens if usage else 0,
         )
 
     def route(self, task: str) -> RoutingDecision:
         """Classify, route, and complete a task."""
-        # Step 1: classify complexity (always on local)
+        # Step 1: classify complexity (always on fast model)
         t0 = time.perf_counter()
         score, reason = self.classify(task)
         classify_ms = (time.perf_counter() - t0) * 1000
 
         # Step 2: route based on threshold
-        backend = "frontier" if score >= self.threshold else "local"
+        backend = "frontier" if score >= self.threshold else "fast"
 
         # Step 3: complete on chosen backend
         t1 = time.perf_counter()
-        if backend == "local":
-            answer, in_tok, out_tok = self._complete_local(task)
+        if backend == "fast":
+            answer, in_tok, out_tok = self._complete_fast(task)
         else:
             answer, in_tok, out_tok = self._complete_frontier(task)
         complete_ms = (time.perf_counter() - t1) * 1000

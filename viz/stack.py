@@ -73,14 +73,14 @@ def draw(ax):
         ("TensorRT-LLM", "compiler\noptimization"),
         ("vLLM", "community\ninference"),
         ("Triton", "multi-model\nserving"),
-        ("CMX", "context memory\n(BlueField-4 DPU)"),
+        ("NIXL", "KV cache transfer\n(zero-copy RDMA)"),
     ]
     ew, gap = 2.2, 0.2
     total_w = len(engines) * ew + (len(engines) - 1) * gap
     sx = (14 - total_w) / 2
     for i, (name, desc) in enumerate(engines):
         x = sx + i * (ew + gap)
-        ec_color = ORANGE if name == "CMX" else BORDER
+        ec_color = ORANGE if name == "NIXL" else BORDER
         card(x, 3.65, ew, 0.8, fc="#161b22", ec=ec_color, lw=0.8)
         label(x + ew / 2, 4.22, name, size=9.5, weight="bold")
         label(x + ew / 2, 3.9, desc, size=7, color=TEXT_DIM)
@@ -100,10 +100,10 @@ def draw(ax):
 
     # Frontier
     card(7.3, 0.85, 5.5, 1.45, fc="#111827", ec=BLUE, lw=0.8)
-    label(10.05, 2.05, "Frontier APIs  (closed)", size=9, weight="bold",
+    label(10.05, 2.05, "Frontier Tier  (NVIDIA API)", size=9, weight="bold",
           color=BLUE)
-    for i, m in enumerate(["Claude (Anthropic)", "GPT-5 (OpenAI)",
-                           "Gemini (Google)"]):
+    for i, m in enumerate(["Mistral Large 3 (675B MoE)",
+                           "DeepSeek R1", "Llama 4 Maverick"]):
         label(8.1, 1.6 - i * 0.35, f"· {m}", size=8.5, ha="left")
 
     # ── Routing arrows ──

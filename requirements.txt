@@ -2,10 +2,8 @@
 matplotlib>=3.8
 numpy>=1.24
 
-# Agent loop (01) — works with any OpenAI-compatible endpoint
+# Agent loop (01), hybrid router (02), news aggregator (03)
+# All use OpenAI-compatible endpoints (NVIDIA API, NIM, Mistral API)
 openai>=1.0
-
-# Hybrid router (02) — frontier backend
-anthropic>=0.40
 
 # News aggregator (03) — no extra deps (uses stdlib urllib + xml.etree)
