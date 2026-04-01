@@ -35,12 +35,10 @@ All accept `--out path/` for custom output directory.
 ```bash
 export NVIDIA_API_KEY=your_key   # from build.nvidia.com
 
-# 01 — Agent loop on Mistral Nemotron
-python projects/01_tool_calling/demo.py \
-  --base-url https://integrate.api.nvidia.com/v1 \
-  --api-key $NVIDIA_API_KEY --model mistralai/mistral-nemotron
+# 01 — Agent loop on Mistral Small 4
+python projects/01_tool_calling/demo.py
 
-# 02 — Hybrid router: Nemotron (fast) + Mistral Large 3 (frontier)
+# 02 — Hybrid router: Mistral Small 4 (fast) + Mistral Large 3 (frontier)
 python projects/02_hybrid_router/demo.py --threshold 0.6
 
 # 03 — AI news aggregator (weekly digest)
@@ -51,7 +49,7 @@ All demos run through the NVIDIA API catalog (`integrate.api.nvidia.com`) — on
 
 ## Projects
 
-Mini projects showcasing the NVIDIA AI inference stack — [Mistral Nemotron](https://build.nvidia.com/mistralai/mistral-nemotron) (12B, agentic tool-calling) and [Mistral Large 3](https://build.nvidia.com/mistralai/mistral-large-3-instruct-2512) (675B MoE, complex reasoning) via a unified API.
+Mini projects showcasing the NVIDIA AI inference stack — [Mistral Small 4](https://build.nvidia.com/mistralai/mistral-small-4-119b-2603) (119B, agentic tool-calling) and [Mistral Large 3](https://build.nvidia.com/mistralai/mistral-large-3-instruct-2512) (675B MoE, complex reasoning) via a unified API.
 
 ### 01 — Tool-Calling Agent Loop ✅
 
@@ -73,7 +71,7 @@ projects/01_tool_calling/
 
 ### 02 — Hybrid Router ✅
 
-> **Route by complexity.** Easy calls → Mistral Nemotron (12B). Hard calls → Mistral Large 3 (675B MoE). Both via NVIDIA API.
+> **Route by complexity.** Easy calls → Mistral Small 4 (119B). Hard calls → Mistral Large 3 (675B MoE). Both via NVIDIA API.
 
 A lightweight routing layer that classifies incoming requests and dispatches them to the right model tier. The same architecture described in the blog article — and the same pattern NVIDIA's OpenShell Privacy Router implements at the infrastructure level. One API key, two intelligence tiers.
 
@@ -83,8 +81,8 @@ projects/02_hybrid_router/
   demo.py     — Run 15 sample tasks → save decisions JSON → render viz
 ```
 
-- Classifier: Nemotron scores task complexity (0–1) in a single call
-- Threshold routing: below 0.6 → Nemotron (fast, cheap), above → Mistral Large 3 (frontier)
+- Classifier: Mistral Small 4 scores task complexity (0–1) in a single call
+- Threshold routing: below 0.6 → Mistral Small 4 (fast, cheap), above → Mistral Large 3 (frontier)
 - Single NVIDIA API key for both tiers — zero vendor fragmentation
 - Aggregate stats: fast %, avg latency, tokens per tier
 - Visualization: `viz/routing.py` plots decisions as a scatter with threshold line
