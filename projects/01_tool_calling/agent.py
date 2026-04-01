@@ -5,14 +5,27 @@ A while(tool_use) agent that lets the model decide which tools to call
 and when to stop. Works with any OpenAI-compatible endpoint: NIM, vLLM,
 Mistral La Plateforme, or OpenAI itself.
 
+Features:
+  - Autonomous tool selection: model controls flow, not hardcoded steps
+  - Verbose mode: real-time visibility into each turn, tool call, and result
+  - Full trace capture: tokens, latency, tool calls per turn (JSON-serializable)
+  - NVIDIA NIM compatible: strips unsupported message fields (audio, refusal,
+    annotations, function_call) that cause 400 errors on NVIDIA endpoints
+
 Usage:
     from agent import Agent
     from tools import registry
 
-    agent = Agent(model="mistralai/mistral-small-4-119b-2603", tools=registry)
+    agent = Agent(
+        model="mistralai/mistral-small-4-119b-2603",
+        tools=registry,
+        base_url="https://integrate.api.nvidia.com/v1",
+        api_key="nvapi-...",
+        verbose=True,   # print each turn, tool call, and result
+    )
     result = agent.run("What files are in the current directory?")
     print(result.answer)
-    print(result.trace)    # full step-by-step trace for visualization
+    print(result.trace)    # flat event list for visualization
 """
 
 import json

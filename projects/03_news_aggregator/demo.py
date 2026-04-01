@@ -4,9 +4,11 @@ Demo: AI News Aggregator — weekly digest powered by Mistral Small 4.
 The agent autonomously:
   1. Lists available AI news sources
   2. Fetches RSS feeds from major AI labs and publications
-  3. Identifies the most significant stories from the past week
+  3. Identifies stories across two categories:
+     - Announcements: model releases, product launches, funding, policy
+     - Insight & Analysis: opinion pieces, trend analyses, benchmark critiques
   4. Fetches full article text for top stories
-  5. Produces a ranked weekly digest with summaries
+  5. Produces a markdown digest with publication dates and reference links
 
 Requires NVIDIA_API_KEY env var (or any OpenAI-compatible endpoint).
 
@@ -41,26 +43,35 @@ from news_tools import registry
 
 SYSTEM_PROMPT = """\
 You are an AI news analyst. Your job is to produce a concise weekly digest \
-of the most significant AI breakthroughs, product launches, and major updates.
+that captures both major announcements AND notable insight pieces.
 
 Workflow:
 1. Call get_date_range to determine the time window.
 2. Call list_news_sources to see available feeds.
 3. Fetch feeds from ALL sources using fetch_feed (call them one at a time).
-4. Review all articles and identify the 5-10 most significant stories — \
-   prioritize: new model releases, major product launches, breakthrough \
-   research papers, significant funding/acquisitions, and policy/regulation changes.
-5. For the top stories, call fetch_article_text to get more detail.
-6. Compile a ranked digest in markdown format with:
-   - A one-line headline per story
+4. Review all articles and select 8-12 stories across TWO categories:
+   a) **Announcements** (5-7): new model releases, product launches, \
+      funding rounds, acquisitions, policy/regulation changes.
+   b) **Insight & Analysis** (3-5): opinion pieces, trend analyses, \
+      research deep-dives, benchmark critiques, or industry commentary \
+      that shape how practitioners think about the field.
+5. For the top stories in both categories, call fetch_article_text to get \
+   more detail.
+6. Compile a digest in markdown with TWO sections. For each entry include:
+   - A one-line headline
+   - The **publication date** exactly as given in the feed's "published" \
+     field (e.g., "Mar 31, 2026"). Do NOT guess or approximate dates.
    - A 2-3 sentence summary explaining why it matters
-   - The source and link
-   - A "Why it matters" section for each entry
+   - A markdown reference-style link at the bottom of the digest \
+     (e.g., [1]: https://example.com "Source Name")
+   Use inline numbered references like [Source][1] next to each headline.
 7. Save the digest using save_digest.
 
-Focus on substance over hype. Prioritize stories that change what builders \
-can do (new models, new APIs, new infrastructure) over opinion pieces or \
-general industry commentary.\
+Focus on substance over hype. The Announcements section should cover what \
+changed; the Insight section should cover what it means.
+
+Important: escape dollar signs as \\$ (e.g., \\$122B) so they are not \
+interpreted as LaTeX math delimiters in markdown renderers.\
 """
 
 

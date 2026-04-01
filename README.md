@@ -59,7 +59,7 @@ The model decides which tools to call and when to stop — no hardcoded step seq
 
 ```
 projects/01_tool_calling/
-  agent.py    — Agent class: while(tool_use) loop with trace capture
+  agent.py    — Agent class: while(tool_use) loop with trace + verbose logging
   tools.py    — ToolRegistry + 5 built-in tools (calculator, file read, etc.)
   demo.py     — Run agent → save trace JSON → render viz
 ```
@@ -67,6 +67,8 @@ projects/01_tool_calling/
 - Works with any OpenAI-compatible endpoint: NIM, vLLM, Mistral API
 - Auto-generates tool schemas from Python type hints
 - Full trace capture: tokens, latency, tool calls per turn
+- **Verbose mode**: real-time turn-by-turn output showing tool calls, results, and timing
+- **NVIDIA NIM compatible**: strips unsupported message fields (`audio`, `refusal`, `annotations`) that cause 400 errors on NVIDIA endpoints
 - Visualization: `viz/trace.py` renders the execution as a vertical flow diagram
 
 ### 02 — Hybrid Router ✅
@@ -89,9 +91,9 @@ projects/02_hybrid_router/
 
 ### 03 — AI News Aggregator ✅
 
-> **Smart weekly digest.** An agent that fetches, filters, and summarizes the week's most significant AI news.
+> **Smart weekly digest.** An agent that fetches, filters, and summarizes the week's most significant AI news — both announcements and insight pieces.
 
-The agent autonomously crawls RSS feeds from 9 major AI sources (OpenAI, Google, Anthropic, NVIDIA, Mistral, DeepMind, HuggingFace, MIT Tech Review, arXiv), identifies the most impactful stories, fetches full article text for top picks, and compiles a ranked markdown digest.
+The agent autonomously crawls RSS feeds from 9 major AI sources (OpenAI, Google, Anthropic, NVIDIA, Mistral, DeepMind, HuggingFace, MIT Tech Review, arXiv), identifies stories across two categories, fetches full article text for top picks, and compiles a structured markdown digest with publication dates and reference-style source links.
 
 ```
 projects/03_news_aggregator/
@@ -100,10 +102,12 @@ projects/03_news_aggregator/
 ```
 
 - 9 built-in AI news sources (RSS/Atom)
+- Two-section digest: **Announcements** (releases, funding, policy) + **Insight & Analysis** (opinion, trends, critiques)
+- Publication dates and reference-style links to original sources
 - Full article text extraction for deep summaries
 - Configurable lookback window (`--days 3`, `--days 14`)
 - Works with NIM, vLLM, or Mistral API — same OpenAI-compatible interface
-- Outputs ranked markdown digest + full agent trace
+- Outputs structured markdown digest + full agent trace
 
 ### 04 — Inference Pattern Benchmarks
 
