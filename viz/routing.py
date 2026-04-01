@@ -94,7 +94,7 @@ def draw(ax, data: list[dict], threshold: float = THRESHOLD):
     # Zone labels (bottom of chart)
     ymax = max(d["latency_ms"] for d in data) * 1.15 if data else 5000
     ax.text(threshold / 2, ymax * 0.03,
-            "FAST TIER\n(Mistral Nemotron 12B)",
+            "FAST TIER\n(Mistral Small 4 119B)",
             fontsize=9, color=ORANGE, ha="center", weight="bold", alpha=0.6)
     ax.text((1 + threshold) / 2, ymax * 0.03,
             "FRONTIER TIER\n(Mistral Large 3 675B)",
@@ -118,10 +118,10 @@ def draw(ax, data: list[dict], threshold: float = THRESHOLD):
             )
 
     # Styling
-    ax.set_xlabel("Complexity Score  (classified by Nemotron)", fontsize=11,
+    ax.set_xlabel("Complexity Score  (classified by Mistral Small 4)", fontsize=11,
                   labelpad=10)
     ax.set_ylabel("Response Latency (ms)", fontsize=11, labelpad=10)
-    ax.set_title("Hybrid Routing: Nemotron vs Large 3 by Task Complexity",
+    ax.set_title("Hybrid Routing: Small 4 vs Large 3 by Task Complexity",
                  fontsize=14, weight="bold", color=TEXT, pad=15)
     ax.set_xlim(-0.02, 1.02)
     ax.legend(fontsize=10, loc="upper left", framealpha=0.9,
