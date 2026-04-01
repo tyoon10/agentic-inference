@@ -8,10 +8,10 @@ The agent autonomously:
   4. Fetches full article text for top stories
   5. Produces a ranked weekly digest with summaries
 
-Requires MISTRAL_API_KEY env var (or any OpenAI-compatible endpoint).
+Requires NVIDIA_API_KEY env var (or any OpenAI-compatible endpoint).
 
 Usage:
-  export MISTRAL_API_KEY=your_key_here
+  export NVIDIA_API_KEY=your_key_here
 
   # Default: weekly digest from all sources
   python projects/03_news_aggregator/demo.py
@@ -19,7 +19,7 @@ Usage:
   # Custom lookback period
   python projects/03_news_aggregator/demo.py --days 3
 
-  # Use NIM endpoint
+  # Use local endpoint
   python projects/03_news_aggregator/demo.py --base-url http://localhost:8000/v1
 """
 
@@ -28,6 +28,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
@@ -64,12 +65,13 @@ general industry commentary.\
 
 
 def main():
+    load_dotenv()
     parser = argparse.ArgumentParser(description="AI News Aggregator demo")
-    parser.add_argument("--model", default="mistral-small-latest")
-    parser.add_argument("--base-url", default="https://api.mistral.ai/v1",
-                        help="OpenAI-compatible endpoint (NIM, vLLM, Mistral API)")
+    parser.add_argument("--model", default="mistralai/mistral-small-4-119b-2603")
+    parser.add_argument("--base-url", default="https://integrate.api.nvidia.com/v1",
+                        help="OpenAI-compatible endpoint (NIM Cloud, vLLM, Mistral API)")
     parser.add_argument("--api-key", default=None,
-                        help="API key (default: MISTRAL_API_KEY env var)")
+                        help="API key (default: NVIDIA_API_KEY env var)")
     parser.add_argument("--out", default="output",
                         help="Output directory")
     parser.add_argument("--days", type=int, default=7,
@@ -78,9 +80,9 @@ def main():
                         help="Max agent turns (default: 25, needs more for multiple feeds)")
     args = parser.parse_args()
 
-    api_key = args.api_key or os.environ.get("MISTRAL_API_KEY")
+    api_key = args.api_key or os.environ.get("NVIDIA_API_KEY") or os.environ.get("MISTRAL_API_KEY")
     if not api_key:
-        print("Error: Set MISTRAL_API_KEY env var or pass --api-key")
+        print("Error: Set NVIDIA_API_KEY env var or pass --api-key")
         sys.exit(1)
 
     print(f"Model:    {args.model}")
@@ -96,6 +98,7 @@ def main():
         api_key=api_key,
         system_prompt=SYSTEM_PROMPT,
         max_turns=args.max_turns,
+        verbose=True,
     )
 
     prompt = (

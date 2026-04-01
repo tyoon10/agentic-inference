@@ -2,7 +2,7 @@
 Hybrid Router — route agent calls between fast and frontier model tiers.
 
 Classifies task complexity using the fast model, then routes:
-  - Below threshold → Mistral Nemotron (12B, fast, cheap)
+  - Below threshold → Mistral Small 4 (119B, fast, cheap)
   - Above threshold → Mistral Large 3 (675B MoE, complex reasoning)
 
 Both tiers served through the same NVIDIA API catalog
@@ -119,7 +119,7 @@ class HybridRouter:
         self,
         base_url: str = "https://integrate.api.nvidia.com/v1",
         api_key: str | None = None,
-        fast_model: str = "mistralai/mistral-nemotron",
+        fast_model: str = "mistralai/mistral-small-4-119b-2603",
         frontier_model: str = "mistralai/mistral-large-3-instruct-2512",
         threshold: float = 0.6,
     ):
@@ -153,7 +153,7 @@ class HybridRouter:
             return 0.5, f"Parse error, raw: {text[:100]}"
 
     def _complete_fast(self, task: str) -> tuple[str, int, int]:
-        """Generate answer using fast model (Nemotron)."""
+        """Generate answer using fast model (Mistral Small 4)."""
         response = self.client.chat.completions.create(
             model=self.fast_model,
             messages=[{"role": "user", "content": task}],

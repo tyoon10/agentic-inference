@@ -23,6 +23,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
@@ -33,7 +34,7 @@ from viz.routing import render as render_routing
 
 
 SAMPLE_TASKS = [
-    # Simple — should route to fast tier (Nemotron)
+    # Simple — should route to fast tier (Mistral Small 4)
     "Classify this email subject as spam or not spam: 'You won $1M click here'",
     "Extract the total amount from: 'Invoice #4521, Total: $2,340.00'",
     "What day of the week is July 4, 2026?",
@@ -56,9 +57,10 @@ SAMPLE_TASKS = [
 
 
 def main():
+    load_dotenv()
     parser = argparse.ArgumentParser(description="Hybrid router demo")
     parser.add_argument("--threshold", type=float, default=0.6)
-    parser.add_argument("--fast-model", default="mistralai/mistral-nemotron")
+    parser.add_argument("--fast-model", default="mistralai/mistral-small-4-119b-2603")
     parser.add_argument("--frontier-model", default="mistralai/mistral-large-3-instruct-2512")
     parser.add_argument("--base-url", default="https://integrate.api.nvidia.com/v1")
     parser.add_argument("--api-key", default=None)
@@ -88,8 +90,8 @@ def main():
     for i, task in enumerate(SAMPLE_TASKS, 1):
         print(f"[{i:2d}/{len(SAMPLE_TASKS)}] ", end="", flush=True)
         decision = router.route(task)
-        icon = "🟠" if decision.backend == "fast" else "🔵"
-        print(f"{icon} {decision.complexity_score:.2f} → {decision.backend:8s} "
+        backend_tag = "FAST" if decision.backend == "fast" else "FRONT"
+        print(f"[{backend_tag}] {decision.complexity_score:.2f} -> {decision.backend:8s} "
               f"({decision.total_ms:,.0f}ms)  {task[:60]}")
 
     # Summary
@@ -108,7 +110,7 @@ def main():
     data_file = out_dir / "routing-decisions.json"
     with open(data_file, "w") as f:
         json.dump(data, f, indent=2)
-    print(f"\nData saved → {data_file}")
+    print(f"\nData saved -> {data_file}")
 
     render_routing(out_dir, data, args.threshold)
 

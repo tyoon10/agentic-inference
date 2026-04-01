@@ -6,7 +6,7 @@ Uses Mistral's La Plateforme by default — no local GPU needed.
 
 Usage:
   # Set your API key
-  export MISTRAL_API_KEY=your_key_here
+  export NVIDIA_API_KEY=your_key_here
 
   # Run with default prompt
   python -m projects.01-tool-calling.demo
@@ -14,7 +14,7 @@ Usage:
   # Custom prompt
   python -m projects.01-tool-calling.demo "How many words are in the README?"
 
-  # Use a local NIM/vLLM endpoint instead
+  # Use a local endpoint instead
   python -m projects.01-tool-calling.demo --base-url http://localhost:8000/v1
 """
 
@@ -23,6 +23,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Add project root to path
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -41,21 +42,22 @@ DEFAULT_PROMPT = (
 
 
 def main():
+    load_dotenv()
     parser = argparse.ArgumentParser(description="Agent loop demo")
     parser.add_argument("prompt", nargs="?", default=DEFAULT_PROMPT)
-    parser.add_argument("--model", default="mistral-small-latest")
-    parser.add_argument("--base-url", default="https://api.mistral.ai/v1",
+    parser.add_argument("--model", default="mistralai/mistral-small-4-119b-2603")
+    parser.add_argument("--base-url", default="https://integrate.api.nvidia.com/v1",
                         help="OpenAI-compatible endpoint")
     parser.add_argument("--api-key", default=None,
-                        help="API key (default: MISTRAL_API_KEY env var)")
+                        help="API key (default: NVIDIA_API_KEY env var)")
     parser.add_argument("--out", default="output",
                         help="Output directory for trace visualization")
     parser.add_argument("--max-turns", type=int, default=10)
     args = parser.parse_args()
 
-    api_key = args.api_key or os.environ.get("MISTRAL_API_KEY")
+    api_key = args.api_key or os.environ.get("NVIDIA_API_KEY") or os.environ.get("MISTRAL_API_KEY")
     if not api_key:
-        print("Error: Set MISTRAL_API_KEY env var or pass --api-key")
+        print("Error: Set NVIDIA_API_KEY env var or pass --api-key")
         sys.exit(1)
 
     print(f"Model:    {args.model}")

@@ -9,7 +9,7 @@ Usage:
     from agent import Agent
     from tools import registry
 
-    agent = Agent(model="mistral-small-latest", tools=registry)
+    agent = Agent(model="mistralai/mistral-small-4-119b-2603", tools=registry)
     result = agent.run("What files are in the current directory?")
     print(result.answer)
     print(result.trace)    # full step-by-step trace for visualization
@@ -100,16 +100,18 @@ class Agent:
 
     def __init__(
         self,
-        model: str = "mistral-small-latest",
+        model: str = "mistralai/mistral-small-4-119b-2603",
         tools=None,
         base_url: str | None = None,
         api_key: str | None = None,
         system_prompt: str | None = None,
         max_turns: int = 10,
+        verbose: bool = False,
     ):
         self.model = model
         self.tools = tools
         self.max_turns = max_turns
+        self.verbose = verbose
         self.system_prompt = system_prompt or (
             "You are a helpful assistant with access to tools. "
             "Use tools when they help answer the user's question. "
@@ -142,6 +144,7 @@ class Agent:
             kwargs = dict(model=self.model, messages=messages)
             if tool_schemas:
                 kwargs["tools"] = tool_schemas
+                kwargs["tool_choice"] = "auto"
             response = self.client.chat.completions.create(**kwargs)
             latency = (time.perf_counter() - t0) * 1000
 
@@ -160,13 +163,25 @@ class Agent:
                 latency_ms=latency,
             )
 
-            # Append assistant message to history
-            messages.append(msg.model_dump())
+            if self.verbose:
+                print(f"\n{'-'*50}")
+                print(f"  Turn {turn}  |  finish_reason={choice.finish_reason}  |  {latency:.0f}ms")
+                if msg.content:
+                    preview = msg.content[:200].replace('\n', ' ')
+                    print(f"  [model] {preview.encode('ascii', 'replace').decode()}{'...' if len(msg.content) > 200 else ''}")
+
+            # Append assistant message to history (strip fields unsupported by some endpoints)
+            dumped = msg.model_dump()
+            for key in ("audio", "function_call", "refusal", "annotations", "reasoning_content"):
+                dumped.pop(key, None)
+            messages.append(dumped)
 
             # ── Check for tool calls ──
             if not msg.tool_calls or choice.finish_reason == "stop":
                 result.answer = msg.content or ""
                 result.steps.append(step)
+                if self.verbose:
+                    print(f"  [stop] Stopping (no tool calls or finish_reason=stop)")
                 break
 
             # ── Execute tools ──
@@ -177,9 +192,19 @@ class Agent:
                 except json.JSONDecodeError:
                     args = {}
 
+                if self.verbose:
+                    args_str = json.dumps(args)
+                    if len(args_str) > 80:
+                        args_str = args_str[:80] + "..."
+                    print(f"  [tool]{func_name}({args_str})")
+
                 t1 = time.perf_counter()
                 tool_result = self.tools.execute(func_name, args)
                 tool_duration = (time.perf_counter() - t1) * 1000
+
+                if self.verbose:
+                    preview = tool_result[:150].replace('\n', ' ')
+                    print(f"     ->{preview}{'...' if len(tool_result) > 150 else ''}  ({tool_duration:.0f}ms)")
 
                 step.tool_calls.append(ToolCall(
                     name=func_name,
