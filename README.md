@@ -4,6 +4,10 @@ Exploring the agentic AI inference stack — from open-weight models to self-hos
 
 Companion repo to [Agents Don't Need Better Models. They Need Better Infrastructure.](https://twyoon.com/post/agents-need-better-infrastructure/)
 
+## Key Insight
+
+Infrastructure choices made at the serving layer — quantization format, inference engine, model routing — directly determine agent performance at the application layer. This repo demonstrates that end-to-end with real telemetry.
+
 ## Quickstart
 
 ```bash
@@ -12,13 +16,14 @@ pip install -r requirements.txt
 
 ### Visualizations
 
-Four publication-quality figures generated from code:
+Five publication-quality figures generated from code:
 
 ```bash
 python -m viz.stack                    # three-layer architecture diagram
 python -m viz.cost                     # API vs self-hosted cost crossover
 python -m viz.trace                    # agent loop execution trace
 python -m viz.routing                  # hybrid routing decisions scatter
+python -m viz.trace_analysis           # news aggregator bottleneck analysis
 ```
 
 All accept `--out path/` for custom output directory.
@@ -29,6 +34,7 @@ All accept `--out path/` for custom output directory.
 | `cost` | Monthly cost crossover at ~5,500 agent calls/day |
 | `trace` | Step-by-step agent loop: model → tool call → result → answer |
 | `routing` | Tasks plotted by complexity, colored by local vs frontier backend |
+| `trace_analysis` | Per-turn latency breakdown showing the synthesis bottleneck |
 
 ### Run the demos (requires API keys)
 
@@ -51,7 +57,7 @@ All demos run through the NVIDIA API catalog (`integrate.api.nvidia.com`) — on
 
 Mini projects showcasing the NVIDIA AI inference stack — [Mistral Small 4](https://build.nvidia.com/mistralai/mistral-small-4-119b-2603) (119B, agentic tool-calling) and [Mistral Large 3](https://build.nvidia.com/mistralai/mistral-large-3-instruct-2512) (675B MoE, complex reasoning) via a unified API.
 
-### 01 — Tool-Calling Agent Loop ✅
+### 01 — Tool-Calling Agent Loop
 
 > **The core pattern.** A `while(tool_use)` agent loop running entirely on Mistral Small 4.
 
@@ -71,7 +77,7 @@ projects/01_tool_calling/
 - **NVIDIA NIM compatible**: strips unsupported message fields (`audio`, `refusal`, `annotations`) that cause 400 errors on NVIDIA endpoints
 - Visualization: `viz/trace.py` renders the execution as a vertical flow diagram
 
-### 02 — Hybrid Router ✅
+### 02 — Hybrid Router
 
 > **Route by complexity.** Easy calls → Mistral Small 4 (119B). Hard calls → Mistral Large 3 (675B MoE). Both via NVIDIA API.
 
@@ -89,7 +95,7 @@ projects/02_hybrid_router/
 - Aggregate stats: fast %, avg latency, tokens per tier
 - Visualization: `viz/routing.py` plots decisions as a scatter with threshold line
 
-### 03 — AI News Aggregator ✅
+### 03 — AI News Aggregator
 
 > **Smart weekly digest.** An agent that fetches, filters, and summarizes the week's most significant AI news — both announcements and insight pieces.
 
@@ -109,38 +115,40 @@ projects/03_news_aggregator/
 - Works with NIM, vLLM, or Mistral API — same OpenAI-compatible interface
 - Outputs structured markdown digest + full agent trace
 
-### 04 — Inference Pattern Benchmarks
+#### Trace Analysis: What Happens Under the Hood
 
-> **Measure what the article claims.** Fan-out, chaining, and iterative loops — benchmarked.
+A single "build me a weekly digest" prompt triggers **5 turns** and **24 tool calls**. The trace analysis reveals where time is actually spent:
 
-| Pattern | Workload | What to measure |
-|---------|----------|-----------------|
-| Parallel fan-out | 23 concurrent classification calls | Throughput ceiling, rate limit impact |
-| Sequential chain | 4-step transcript → summary → actions → push | End-to-end latency |
-| Iterative loop | 3-pass draft → evaluate → revise | Token cost scaling, context growth |
+| Turn | Tool Calls | What Happens | Time |
+|------|-----------|--------------|------|
+| 1 | 2 | `get_date_range` + `list_news_sources` — setup | <1s |
+| 2 | 9 | `fetch_feed` × 9 — all RSS sources in parallel | 5.5s |
+| 3 | 12 | `fetch_article_text` × 12 — full text for top stories | 12.3s |
+| **4** | **1** | **`save_digest` — model synthesizes 12 articles into structured markdown** | **47.1s** |
+| 5 | 0 | Final answer | 1.8s |
 
-### 05 — Devstral Code Agent
+**The bottleneck is Turn 4**: the model spends 47 seconds generating 3,660 tokens to synthesize 12 full articles into a categorized, sourced digest. This is 71% of total execution time — and it's entirely model inference, not I/O. This is exactly the kind of workload where infrastructure choices (quantization, inference engine, batch scheduling) determine whether your agent feels fast or slow.
 
-> **Agentic coding on open weights.** [Devstral](https://huggingface.co/mistralai/Devstral-Small-2507) (24B active / 123B total) as a local Copilot alternative.
-
-Build a minimal code agent that reads a file, identifies issues, proposes fixes, and applies them — the same loop Claude Code and Codex run, but on a self-hosted model.
+Run `python -m viz.trace_analysis` to generate the per-turn latency breakdown diagram.
 
 ## Structure
 
 ```
 agentic-inference/
-  viz/                          # Visualization modules (matplotlib, dark theme)
-    theme.py                    # Shared NVIDIA-green palette
-    stack.py                    # Three-layer architecture diagram
-    cost.py                     # API vs self-hosted cost crossover
-    trace.py                    # Agent loop execution trace
-    routing.py                  # Hybrid routing decisions scatter
+  CLAUDE.md                       # Agent instructions and coding standards
+  ARCHITECTURE.md                 # Strategic overview: NVIDIA NIM ecosystem
+  viz/                            # Visualization modules (matplotlib, dark theme)
+    theme.py                      # Shared NVIDIA-green palette
+    stack.py                      # Three-layer architecture diagram
+    cost.py                       # API vs self-hosted cost crossover
+    trace.py                      # Agent loop execution trace
+    routing.py                    # Hybrid routing decisions scatter
+    trace_analysis.py             # News aggregator bottleneck analysis
   projects/
-    01_tool_calling/            # ✅ Agent loop + tool registry
-    02_hybrid_router/           # ✅ Complexity-based routing
-    03_news_aggregator/         # ✅ AI news digest agent
-    04_inference_benchmarks/    # Benchmark fan-out, chain, loop
-    05_devstral_code_agent/     # Code agent on Devstral
+    01_tool_calling/              # Agent loop + tool registry
+    02_hybrid_router/             # Complexity-based routing
+    03_news_aggregator/           # AI news digest agent
+  output/                         # Generated visualizations + digests
 ```
 
 ## Stack Reference
