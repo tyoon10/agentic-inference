@@ -177,11 +177,17 @@ def draw(ax, trace: list[dict]):
 
 
 def render(out_dir: Path, trace: list[dict] | None = None):
+    is_demo = trace is None
     apply_theme()
     trace = trace or DEMO_TRACE
     h = max(8, len(trace) * 1.3 + 2.5)
     fig, ax = plt.subplots(figsize=(10, h))
     draw(ax, trace)
+    if is_demo:
+        fig.text(0.5, 0.01,
+                 "Illustrative trace — a simplified agent run showing the loop structure."
+                 "  Render a captured run with --json <trace.json>.",
+                 ha="center", fontsize=7.5, color=TEXT_DIM)
     out = out_dir / "agent-loop-trace.png"
     fig.savefig(out, dpi=200, bbox_inches="tight", pad_inches=0.3)
     plt.close(fig)

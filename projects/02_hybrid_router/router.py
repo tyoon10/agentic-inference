@@ -81,12 +81,13 @@ class RouterStats:
         return sum(d.total_ms for d in self.decisions) / self.total
 
     def to_viz_data(self) -> list[dict]:
-        """Export for visualization."""
+        """Export for visualization. Backend names stay truthful: both tiers
+        are API calls — "fast" (Small 4) and "frontier" (Large 3)."""
         return [
             {
                 "task": d.task[:80],
                 "complexity": d.complexity_score,
-                "backend": "local" if d.backend == "fast" else "frontier",
+                "backend": d.backend,
                 "latency_ms": d.total_ms,
                 "tokens": d.input_tokens + d.output_tokens,
             }

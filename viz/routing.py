@@ -2,7 +2,7 @@
 Hybrid Router — Routing Decision Visualization
 
 Scatter plot showing tasks by complexity score, colored by which backend
-handled them (local vs frontier), with the threshold line.
+handled them (fast vs frontier tier — both NVIDIA API), with the threshold line.
 
 Works with routing data from projects/02-hybrid-router/router.py or
 with raw data dicts for demo/testing.
@@ -26,21 +26,21 @@ from .theme import GREEN, BLUE, ORANGE, RED_SOFT, PURPLE
 # Demo routing data (matches RouterStats.to_viz_data() output)
 DEMO_DATA = [
     {"task": "Classify this email as spam or not", "complexity": 0.15,
-     "backend": "local", "latency_ms": 180, "tokens": 95},
+     "backend": "fast", "latency_ms": 180, "tokens": 95},
     {"task": "Extract the dollar amount from this invoice", "complexity": 0.20,
-     "backend": "local", "latency_ms": 210, "tokens": 82},
+     "backend": "fast", "latency_ms": 210, "tokens": 82},
     {"task": "What day of the week is March 15, 2026?", "complexity": 0.10,
-     "backend": "local", "latency_ms": 150, "tokens": 45},
+     "backend": "fast", "latency_ms": 150, "tokens": 45},
     {"task": "Summarize this 3-page contract", "complexity": 0.45,
-     "backend": "local", "latency_ms": 890, "tokens": 520},
+     "backend": "fast", "latency_ms": 890, "tokens": 520},
     {"task": "Route this support ticket to the right team", "complexity": 0.25,
-     "backend": "local", "latency_ms": 195, "tokens": 78},
+     "backend": "fast", "latency_ms": 195, "tokens": 78},
     {"task": "Parse JSON and validate schema", "complexity": 0.18,
-     "backend": "local", "latency_ms": 160, "tokens": 65},
+     "backend": "fast", "latency_ms": 160, "tokens": 65},
     {"task": "Translate this paragraph to French", "complexity": 0.35,
-     "backend": "local", "latency_ms": 420, "tokens": 240},
+     "backend": "fast", "latency_ms": 420, "tokens": 240},
     {"task": "Rewrite this paragraph for a different audience", "complexity": 0.50,
-     "backend": "local", "latency_ms": 680, "tokens": 380},
+     "backend": "fast", "latency_ms": 680, "tokens": 380},
     {"task": "Analyze competitive positioning across 4 companies", "complexity": 0.75,
      "backend": "frontier", "latency_ms": 2800, "tokens": 1850},
     {"task": "Write a persuasive appeal for a denied insurance claim", "complexity": 0.82,
@@ -54,9 +54,9 @@ DEMO_DATA = [
     {"task": "Evaluate trade-offs between 3 database architectures", "complexity": 0.70,
      "backend": "frontier", "latency_ms": 2500, "tokens": 1600},
     {"task": "Generate unit tests for this function", "complexity": 0.40,
-     "backend": "local", "latency_ms": 550, "tokens": 310},
+     "backend": "fast", "latency_ms": 550, "tokens": 310},
     {"task": "Normalize these addresses to USPS format", "complexity": 0.22,
-     "backend": "local", "latency_ms": 175, "tokens": 90},
+     "backend": "fast", "latency_ms": 175, "tokens": 90},
 ]
 
 THRESHOLD = 0.6
@@ -65,23 +65,23 @@ THRESHOLD = 0.6
 def draw(ax, data: list[dict], threshold: float = THRESHOLD):
     """Render routing scatter plot."""
 
-    local = [d for d in data if d["backend"] == "local"]
+    fast = [d for d in data if d["backend"] == "fast"]
     frontier = [d for d in data if d["backend"] == "frontier"]
 
     # Scatter
-    if local:
+    if fast:
         ax.scatter(
-            [d["complexity"] for d in local],
-            [d["latency_ms"] for d in local],
+            [d["complexity"] for d in fast],
+            [d["latency_ms"] for d in fast],
             c=ORANGE, s=90, alpha=0.85, edgecolors="white", linewidth=0.5,
-            label=f"Local  ({len(local)} tasks)", zorder=3,
+            label=f"Fast tier — Small 4 via API  ({len(fast)} tasks)", zorder=3,
         )
     if frontier:
         ax.scatter(
             [d["complexity"] for d in frontier],
             [d["latency_ms"] for d in frontier],
             c=BLUE, s=90, alpha=0.85, edgecolors="white", linewidth=0.5,
-            label=f"Frontier  ({len(frontier)} tasks)", zorder=3,
+            label=f"Frontier tier — Large 3 via API  ({len(frontier)} tasks)", zorder=3,
         )
 
     # Threshold line
@@ -108,11 +108,12 @@ def draw(ax, data: list[dict], threshold: float = THRESHOLD):
     for d in data:
         if d["complexity"] in (0.10, 0.92, 0.50):  # extremes + near boundary
             short = d["task"][:35] + "..." if len(d["task"]) > 35 else d["task"]
-            color = ORANGE if d["backend"] == "local" else BLUE
+            color = ORANGE if d["backend"] == "fast" else BLUE
+            offset = (-150, -22) if d["complexity"] > 0.8 else (15, 10)
             ax.annotate(
                 short,
                 xy=(d["complexity"], d["latency_ms"]),
-                xytext=(15, 10), textcoords="offset points",
+                xytext=offset, textcoords="offset points",
                 fontsize=7, color=TEXT_DIM, alpha=0.8,
                 arrowprops=dict(arrowstyle="-", color=TEXT_DIM, lw=0.5, alpha=0.4),
             )
@@ -129,12 +130,12 @@ def draw(ax, data: list[dict], threshold: float = THRESHOLD):
     ax.grid(True, alpha=0.2)
 
     # Stats box
-    local_pct = len(local) / len(data) * 100 if data else 0
-    avg_local_ms = np.mean([d["latency_ms"] for d in local]) if local else 0
+    fast_pct = len(fast) / len(data) * 100 if data else 0
+    avg_fast_ms = np.mean([d["latency_ms"] for d in fast]) if fast else 0
     avg_frontier_ms = np.mean([d["latency_ms"] for d in frontier]) if frontier else 0
     stats_text = (
-        f"Local: {local_pct:.0f}% of tasks  ·  avg {avg_local_ms:.0f}ms\n"
-        f"Frontier: {100-local_pct:.0f}% of tasks  ·  avg {avg_frontier_ms:.0f}ms"
+        f"Fast tier: {fast_pct:.0f}% of tasks  ·  avg {avg_fast_ms:.0f}ms\n"
+        f"Frontier: {100-fast_pct:.0f}% of tasks  ·  avg {avg_frontier_ms:.0f}ms"
     )
     ax.text(0.98, 0.98, stats_text, transform=ax.transAxes,
             fontsize=8.5, color=TEXT_DIM, va="top", ha="right",
@@ -144,9 +145,15 @@ def draw(ax, data: list[dict], threshold: float = THRESHOLD):
 def render(out_dir: Path, data: list[dict] | None = None,
            threshold: float = THRESHOLD):
     apply_theme()
+    is_demo = data is None
     data = data or DEMO_DATA
     fig, ax = plt.subplots(figsize=(12, 7))
     draw(ax, data, threshold)
+    if is_demo:
+        fig.text(0.5, 0.01,
+                 "Illustrative demo data — synthetic tasks and latencies showing the routing pattern."
+                 "  Both tiers are NVIDIA API calls; regenerate from real runs with --json.",
+                 ha="center", fontsize=7.5, color=TEXT_DIM)
     out = out_dir / "hybrid-routing-decisions.png"
     fig.savefig(out, dpi=200, bbox_inches="tight", pad_inches=0.3)
     plt.close(fig)
