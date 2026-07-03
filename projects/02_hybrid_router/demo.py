@@ -61,7 +61,7 @@ def main():
     parser = argparse.ArgumentParser(description="Hybrid router demo")
     parser.add_argument("--threshold", type=float, default=0.6)
     parser.add_argument("--fast-model", default="mistralai/mistral-small-4-119b-2603")
-    parser.add_argument("--frontier-model", default="mistralai/mistral-large-3-instruct-2512")
+    parser.add_argument("--frontier-model", default="mistralai/mistral-large-3-675b-instruct-2512")
     parser.add_argument("--base-url", default="https://integrate.api.nvidia.com/v1")
     parser.add_argument("--api-key", default=None)
     parser.add_argument("--out", default="output")

@@ -121,7 +121,7 @@ class HybridRouter:
         base_url: str = "https://integrate.api.nvidia.com/v1",
         api_key: str | None = None,
         fast_model: str = "mistralai/mistral-small-4-119b-2603",
-        frontier_model: str = "mistralai/mistral-large-3-instruct-2512",
+        frontier_model: str = "mistralai/mistral-large-3-675b-instruct-2512",
         threshold: float = 0.6,
     ):
         self.threshold = threshold
