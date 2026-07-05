@@ -104,19 +104,37 @@ def draw(ax, data: list[dict], threshold: float = THRESHOLD):
     ax.axvspan(0, threshold, alpha=0.04, color=ORANGE, zorder=0)
     ax.axvspan(threshold, 1, alpha=0.04, color=BLUE, zorder=0)
 
-    # Task labels (annotate a few interesting ones)
-    for d in data:
-        if d["complexity"] in (0.10, 0.92, 0.50):  # extremes + near boundary
-            short = d["task"][:35] + "..." if len(d["task"]) > 35 else d["task"]
-            color = ORANGE if d["backend"] == "fast" else BLUE
-            offset = (-150, -22) if d["complexity"] > 0.8 else (15, 10)
-            ax.annotate(
-                short,
-                xy=(d["complexity"], d["latency_ms"]),
-                xytext=offset, textcoords="offset points",
-                fontsize=7, color=TEXT_DIM, alpha=0.8,
-                arrowprops=dict(arrowstyle="-", color=TEXT_DIM, lw=0.5, alpha=0.4),
-            )
+    # Task labels — annotate only well-separated extremes so real, clustered
+    # data doesn't pile labels on top of each other. Pick the lowest-complexity
+    # task, the highest-latency task, and the fastest-tier outlier; skip any
+    # that would collide with one already placed.
+    def _short(d):
+        return d["task"][:32] + "..." if len(d["task"]) > 32 else d["task"]
+
+    candidates = []
+    if data:
+        candidates.append(min(data, key=lambda d: d["complexity"]))      # simplest
+        candidates.append(max(data, key=lambda d: d["latency_ms"]))      # slowest
+        fast_sorted = sorted(fast, key=lambda d: d["latency_ms"], reverse=True)
+        if fast_sorted:
+            candidates.append(fast_sorted[0])                            # fast-tier outlier
+
+    placed = []
+    for d in candidates:
+        key = (round(d["complexity"], 2), round(d["latency_ms"], -2))
+        if key in placed:
+            continue
+        placed.append(key)
+        high = d["complexity"] > 0.55
+        offset = (-160, 12) if high else (14, 12)
+        ax.annotate(
+            _short(d),
+            xy=(d["complexity"], d["latency_ms"]),
+            xytext=offset, textcoords="offset points",
+            fontsize=7.5, color=TEXT_DIM, alpha=0.9, va="bottom",
+            ha="right" if high else "left",
+            arrowprops=dict(arrowstyle="-", color=TEXT_DIM, lw=0.5, alpha=0.4),
+        )
 
     # Styling
     ax.set_xlabel("Complexity Score  (classified by Mistral Small 4)", fontsize=11,
@@ -137,9 +155,9 @@ def draw(ax, data: list[dict], threshold: float = THRESHOLD):
         f"Fast tier: {fast_pct:.0f}% of tasks  ·  avg {avg_fast_ms:.0f}ms\n"
         f"Frontier: {100-fast_pct:.0f}% of tasks  ·  avg {avg_frontier_ms:.0f}ms"
     )
-    ax.text(0.98, 0.98, stats_text, transform=ax.transAxes,
-            fontsize=8.5, color=TEXT_DIM, va="top", ha="right",
-            bbox=dict(fc=CARD_BG, ec=BORDER, boxstyle="round,pad=0.4", alpha=0.9))
+    ax.text(0.03, 0.60, stats_text, transform=ax.transAxes,
+            fontsize=9, color=TEXT, va="top", ha="left",
+            bbox=dict(fc=CARD_BG, ec=BORDER, boxstyle="round,pad=0.5", alpha=0.95))
 
 
 def render(out_dir: Path, data: list[dict] | None = None,

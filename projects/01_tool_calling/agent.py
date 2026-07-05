@@ -29,9 +29,23 @@ Usage:
 """
 
 import json
+import re
 import time
 from dataclasses import dataclass, field
 from openai import OpenAI
+
+
+# NVIDIA's endpoint rejects raw control characters in the request body
+# ("Invalid control character at..."). Tool results that scrape web content
+# routinely carry them (NULs, form feeds, stray escapes). Strip everything
+# below 0x20 except tab / newline / carriage return before it re-enters the
+# message history. Same class of fix as stripping unsupported message fields.
+_CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def _strip_control(s):
+    """Remove control characters that break strict JSON parsing downstream."""
+    return _CONTROL_CHARS.sub("", s) if isinstance(s, str) else s
 
 
 @dataclass
@@ -187,6 +201,8 @@ class Agent:
             dumped = msg.model_dump()
             for key in ("audio", "function_call", "refusal", "annotations", "reasoning_content"):
                 dumped.pop(key, None)
+            if isinstance(dumped.get("content"), str):
+                dumped["content"] = _strip_control(dumped["content"])
             messages.append(dumped)
 
             # ── Check for tool calls ──
@@ -229,7 +245,7 @@ class Agent:
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc.id,
-                    "content": tool_result,
+                    "content": _strip_control(tool_result),
                 })
 
             result.steps.append(step)

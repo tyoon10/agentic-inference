@@ -101,9 +101,12 @@ def draw(ax, trace: list[dict]):
         etype = event["type"]
 
         if etype == "model":
-            # Blue card — model reasoning
+            # Blue card — model reasoning (cap to ~3 lines so it fits the card)
             color = BLUE
-            content = _wrap(event["content"], 50)
+            text = event["content"]
+            if len(text) > 150:
+                text = text[:147].rstrip() + "..."
+            content = _wrap(text, 50)
             stats = f'{event["tokens"]} tok · {event["latency_ms"]:.0f}ms'
             icon = "LLM"
         elif etype == "tool_call":
