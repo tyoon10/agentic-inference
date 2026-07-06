@@ -211,7 +211,7 @@ def main():
     print("Collecting results…")
     data = collect()
     if not data:
-        print("No results found in benchmarks/results/. Run benchmarks/run_bench.sh first.")
+        print(f"No results found in {RESULTS}. Run benchmarks/run_bench.sh first.")
         sys.exit(1)
     render_figure(data, out_dir)
     write_results_md(data, out_dir)
