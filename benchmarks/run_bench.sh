@@ -20,15 +20,24 @@
 #   Disk    : 30GB+ for the model + envs
 #
 # USAGE (from the repo root, on the GPU):
-#   bash benchmarks/run_bench.sh
+#   bash benchmarks/run_bench.sh            # both engines (RunPod / one env)
+#   bash benchmarks/run_bench.sh vllm       # vLLM only   (Colab: run, then Restart runtime)
+#   bash benchmarks/run_bench.sh sglang     # SGLang only (Colab: fresh runtime)
 #   python benchmarks/summarize.py          # -> figure + RESULTS.md + registry YAML
+#
+# vLLM and SGLang pin conflicting deps — installing BOTH in one env is the main
+# failure mode. On RunPod the sequential install usually survives; on Colab, run
+# each engine in a fresh runtime (see benchmarks/COLAB.md). summarize.py combines
+# whatever result files exist, so per-engine runs compose cleanly.
 #
 # ~15-20 min wall / a few GPU-dollars. Everything writes to benchmarks/results/.
 # ---------------------------------------------------------------------------
 set -uo pipefail
 
+ENGINE="${1:-all}"   # all | vllm | sglang
+
 MODEL="${MODEL:-Qwen/Qwen2.5-3B-Instruct}"
-OUT="benchmarks/results"
+OUT="${BENCH_RESULTS:-benchmarks/results}"   # override to a Drive path for Colab's per-engine flow
 LOGS="$OUT/logs"
 mkdir -p "$LOGS"
 
@@ -56,6 +65,7 @@ wait_ready() {  # $1 = url, $2 = label, times out after ~5 min
 }
 
 # =========================== vLLM ===========================
+if [ "$ENGINE" = "all" ] || [ "$ENGINE" = "vllm" ]; then
 log "Installing vLLM (bench extras)"
 pip install -q "vllm[bench]" || { warn "vllm install failed"; }
 
@@ -77,8 +87,10 @@ run_vllm () {  # $1 = tag, $2 = extra `vllm serve` flags
 }
 run_vllm cache-on  ""
 run_vllm cache-off "--no-enable-prefix-caching"
+fi
 
 # =========================== SGLang ===========================
+if [ "$ENGINE" = "all" ] || [ "$ENGINE" = "sglang" ]; then
 log "Installing SGLang"
 pip install -q "sglang[all]" || { warn "sglang install failed"; }
 
@@ -102,6 +114,7 @@ run_sglang () {  # $1 = tag, $2 = extra launch flags
 }
 run_sglang cache-on  ""
 run_sglang cache-off "--disable-radix-cache"
+fi
 
-log "Done. Raw results in $OUT/. Now run:  python benchmarks/summarize.py"
+log "Done ($ENGINE). Raw results in $OUT/. When both engines are done, run:  python benchmarks/summarize.py"
 ls -la "$OUT"

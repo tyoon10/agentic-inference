@@ -13,13 +13,15 @@ Usage:
 """
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-RESULTS = ROOT / "benchmarks" / "results"
+# Override with BENCH_RESULTS to read raw results from a Drive path (Colab per-engine flow).
+RESULTS = Path(os.environ.get("BENCH_RESULTS", ROOT / "benchmarks" / "results"))
 
 # Which metrics we lift out of each engine's result blob (defensive key lookup).
 METRICS = {

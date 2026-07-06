@@ -15,7 +15,9 @@ that survives review.
 
 ## Run it
 
-Provision a CUDA GPU. A [RunPod](https://runpod.io) pod works well:
+Any CUDA GPU works. Two paths:
+
+**RunPod (recommended, ~$0.25, plain shell):**
 
 | Setting | Value |
 |---|---|
@@ -23,12 +25,18 @@ Provision a CUDA GPU. A [RunPod](https://runpod.io) pod works well:
 | Template | a PyTorch image on **CUDA 12.x** — avoid CUDA 13.2 images (a known mid-2026 bug garbles Qwen output) |
 | Disk | 30GB+ |
 
-Then, from the repo root on the pod:
-
 ```bash
-bash benchmarks/run_bench.sh        # ~15-20 min, a few GPU-dollars
+bash benchmarks/run_bench.sh        # both engines, ~15-20 min
 python benchmarks/summarize.py      # -> figure, RESULTS.md, registry entries
 ```
+
+**Google Colab Pro** (if you already pay for it): see **[COLAB.md](COLAB.md)** —
+the notebook cell sequence, plus how to isolate the two engines (they pin
+conflicting deps) and pull artifacts off the ephemeral disk.
+
+The runner takes an optional engine selector so the two can run separately
+(`run_bench.sh vllm` / `run_bench.sh sglang`); `summarize.py` composes whatever
+result files exist.
 
 `run_bench.sh` installs both engines, serves the model four ways
 (vLLM cache-on/off, SGLang radix-on/off), and benches each. `summarize.py`
