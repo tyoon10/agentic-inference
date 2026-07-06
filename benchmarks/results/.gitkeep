@@ -1,0 +1,3 @@
+Raw benchmark results land here when you run ../run_bench.sh on a GPU.
+Generated files (vllm-*.json, sglang-*.jsonl, ../RESULTS.md,
+../registry-entries.yaml) are gitignored until they hold real data.

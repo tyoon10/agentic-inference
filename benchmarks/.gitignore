@@ -1,0 +1,5 @@
+results/*.json
+results/*.jsonl
+results/logs/
+RESULTS.md
+registry-entries.yaml
