@@ -104,6 +104,25 @@ Image("output/serving-prefix-cache-benchmark.png")
 
 ---
 
+## Troubleshooting: `ImportError: libcudart.so.13`
+
+vLLM/SGLang's default PyPI wheels may be built for **CUDA 13**, but Colab runs
+**CUDA 12** — so the engine crashes on startup looking for `libcudart.so.13`.
+Fix: install the CUDA-12.9 (`cu129`) build from the GitHub release, then re-run
+(the harness skips reinstalling anything already importable). For vLLM 0.24.0:
+
+```python
+!pip uninstall -y vllm
+!pip install "https://github.com/vllm-project/vllm/releases/download/v0.24.0/vllm-0.24.0+cu129-cp38-abi3-manylinux_2_28_x86_64.whl" \
+    pandas datasets --extra-index-url https://download.pytorch.org/whl/cu129 2>&1 | tail -20
+!python -c "import vllm; print('vllm', vllm.__version__, 'OK')"
+```
+
+Then `!bash benchmarks/run_bench.sh vllm`. For a different vLLM version, find the
+matching `+cu129...x86_64.whl` asset on that version's GitHub release page. (This
+CUDA-13-vs-12 mismatch is exactly the environment friction a RunPod pod with a
+CUDA-12.x template avoids — see the main README.)
+
 ## After the run
 
 1. Fill the real GPU (e.g. "Colab L4 24GB") into `RESULTS.md` and each registry

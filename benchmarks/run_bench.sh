@@ -73,10 +73,14 @@ wait_ready() {  # $1 = url, $2 = label, $3 = server logfile. Times out after 4 m
 
 # =========================== vLLM ===========================
 if [ "$ENGINE" = "all" ] || [ "$ENGINE" = "vllm" ]; then
-log "Installing vLLM — the slow part (several minutes; GPU stays idle until it serves)"
-pip install "vllm[bench]" 2>&1 | tail -15
+if python -c "import vllm" 2>/dev/null; then
+  log "vLLM already installed ($(python -c 'import vllm; print(vllm.__version__)')) — skipping install"
+else
+  log "Installing vLLM — the slow part (several minutes; GPU stays idle until it serves)"
+  pip install "vllm[bench]" 2>&1 | tail -15
+fi
 if ! python -c "import vllm; print('vllm', vllm.__version__)" 2>&1; then
-  warn "vLLM did not install/import cleanly (see pip output above) — skipping vLLM engine."
+  warn "vLLM did not install/import cleanly (see output above) — skipping vLLM engine."
   ENGINE="${ENGINE/vllm/}"; [ "$ENGINE" = "all" ] && ENGINE="sglang"
 fi
 fi
@@ -104,10 +108,14 @@ fi
 
 # =========================== SGLang ===========================
 if [ "$ENGINE" = "all" ] || [ "$ENGINE" = "sglang" ]; then
-log "Installing SGLang (several minutes)"
-pip install "sglang[all]" 2>&1 | tail -15
+if python -c "import sglang" 2>/dev/null; then
+  log "SGLang already installed ($(python -c 'import sglang; print(sglang.__version__)')) — skipping install"
+else
+  log "Installing SGLang (several minutes)"
+  pip install "sglang[all]" 2>&1 | tail -15
+fi
 if ! python -c "import sglang; print('sglang', sglang.__version__)" 2>&1; then
-  warn "SGLang did not install/import cleanly (see pip output above) — skipping SGLang engine."
+  warn "SGLang did not install/import cleanly (see output above) — skipping SGLang engine."
   ENGINE="${ENGINE/sglang/}"
 fi
 fi
