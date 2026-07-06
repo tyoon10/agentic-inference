@@ -64,11 +64,39 @@ SGLANG_EXTRA="--attention-backend triton" bash benchmarks/run_bench.sh
 (Slightly slower, but it unblocks the run. Note the fallback in RESULTS.md if
 you used it — it affects the SGLang absolute numbers, not the on-vs-off delta.)
 
+## Design decisions
+
+A few choices are deliberate and worth naming:
+
+- **Per-engine A/B, not a vLLM-vs-SGLang race.** Kernel-backend differences on a
+  small consumer GPU would dominate a cross-engine comparison, so a "winner"
+  claim wouldn't survive review. Measuring each engine against *itself* (cache on
+  vs off) yields a defensible number: "caching cut TTFT by X% on this workload."
+- **Shared-prefix workload.** Prefix/radix caching only helps when requests share
+  a prefix — which is exactly the shape of an agentic workload that reuses a
+  system prompt. `PREFIX_LEN=0` collapses the effect; the workload is the honest
+  disclosure of what's being measured.
+- **The processor computes every number.** `summarize.py` reads the engines' raw
+  result files and derives the table, figure, and claims records — nothing is
+  hand-entered, so a published number can't drift from what was measured. A
+  config that fails is reported as missing, not guessed.
+- **Fail fast, loud, and visible.** An import check aborts a broken engine in
+  seconds rather than hanging on a server that will never start, and server
+  failures dump their log. Debugging a serving stack blind is the worst case, so
+  the harness is built to make the failure obvious.
+
 ## Honesty notes
 
-- Every number in the outputs comes from the raw result files; nothing is
-  hand-entered. A config that fails to run is reported as missing, not guessed.
 - Absolute numbers are small-GPU, small-model, single-node — they illustrate the
   *mechanism*, not datacenter performance. The claim is the on-vs-off delta.
 - Fill the real GPU name into RESULTS.md and the registry `attribution` before
   citing anything externally.
+
+## Status
+
+The harness is complete and the processor is validated against fixtures. Running
+it end-to-end needs a GPU on a **CUDA-consistent image** — the main friction is
+that engine wheels and the base environment must agree on a CUDA major version
+(see [COLAB.md](COLAB.md) for the `libcudart.so.13` CUDA-13-vs-12 fix). The
+cleanest path is a prebuilt engine image (e.g. RunPod's `vllm/vllm-openai`),
+where nothing needs installing and `run_bench.sh <engine>` runs straight through.
