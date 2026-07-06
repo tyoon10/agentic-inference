@@ -55,27 +55,40 @@ SGLANG_EXTRA="${SGLANG_EXTRA:-}"
 log()  { printf '\n\033[1;32m>>> %s\033[0m\n' "$*"; }
 warn() { printf '\n\033[1;33m!!! %s\033[0m\n' "$*"; }
 
-wait_ready() {  # $1 = url, $2 = label, times out after ~5 min
-  local url="$1" label="$2" i=0
+wait_ready() {  # $1 = url, $2 = label, $3 = server logfile. Times out after 4 min.
+  local url="$1" label="$2" logf="$3" i=0
+  printf '    waiting for %s ' "$label"
   until curl -sf "$url" >/dev/null 2>&1; do
-    sleep 3; i=$((i+1))
-    if [ $i -gt 100 ]; then warn "$label did not become ready — check $LOGS"; return 1; fi
+    sleep 3; i=$((i+1)); printf '.'
+    # if the server process already died, stop waiting immediately
+    if [ $((i % 5)) -eq 0 ] && ! kill -0 "$SVR_PID" 2>/dev/null; then
+      warn "$label process exited before serving — last log lines:"; tail -30 "$logf" 2>/dev/null; return 1
+    fi
+    if [ $i -gt 80 ]; then
+      warn "$label not ready after 4 min — last log lines:"; tail -30 "$logf" 2>/dev/null; return 1
+    fi
   done
-  log "$label ready"
+  printf '\n'; log "$label ready"
 }
 
 # =========================== vLLM ===========================
 if [ "$ENGINE" = "all" ] || [ "$ENGINE" = "vllm" ]; then
-log "Installing vLLM (bench extras)"
-pip install -q "vllm[bench]" || { warn "vllm install failed"; }
+log "Installing vLLM — the slow part (several minutes; GPU stays idle until it serves)"
+pip install "vllm[bench]" 2>&1 | tail -15
+if ! python -c "import vllm; print('vllm', vllm.__version__)" 2>&1; then
+  warn "vLLM did not install/import cleanly (see pip output above) — skipping vLLM engine."
+  ENGINE="${ENGINE/vllm/}"; [ "$ENGINE" = "all" ] && ENGINE="sglang"
+fi
+fi
+if [ "$ENGINE" = "all" ] || [ "$ENGINE" = "vllm" ]; then
 
 run_vllm () {  # $1 = tag, $2 = extra `vllm serve` flags
   local tag="$1" serve_flags="$2"
   log "vLLM serve ($tag): $serve_flags"
   vllm serve "$MODEL" --port 8000 --disable-log-requests $serve_flags \
     > "$LOGS/vllm-$tag.log" 2>&1 &
-  local svr=$!
-  if wait_ready "http://localhost:8000/v1/models" "vLLM($tag)"; then
+  SVR_PID=$!; local svr=$SVR_PID
+  if wait_ready "http://localhost:8000/v1/models" "vLLM($tag)" "$LOGS/vllm-$tag.log"; then
     vllm bench serve --model "$MODEL" --base-url "http://localhost:8000" \
       --dataset-name random --num-prompts "$NUM_PROMPTS" \
       --random-input-len "$INPUT_LEN" --random-output-len "$OUTPUT_LEN" \
@@ -91,16 +104,22 @@ fi
 
 # =========================== SGLang ===========================
 if [ "$ENGINE" = "all" ] || [ "$ENGINE" = "sglang" ]; then
-log "Installing SGLang"
-pip install -q "sglang[all]" || { warn "sglang install failed"; }
+log "Installing SGLang (several minutes)"
+pip install "sglang[all]" 2>&1 | tail -15
+if ! python -c "import sglang; print('sglang', sglang.__version__)" 2>&1; then
+  warn "SGLang did not install/import cleanly (see pip output above) — skipping SGLang engine."
+  ENGINE="${ENGINE/sglang/}"
+fi
+fi
+if [ "$ENGINE" = "all" ] || [ "$ENGINE" = "sglang" ]; then
 
 run_sglang () {  # $1 = tag, $2 = extra launch flags
   local tag="$1" launch_flags="$2"
   log "SGLang launch ($tag): $launch_flags $SGLANG_EXTRA"
   python -m sglang.launch_server --model-path "$MODEL" --port 8001 \
     $launch_flags $SGLANG_EXTRA > "$LOGS/sglang-$tag.log" 2>&1 &
-  local svr=$!
-  if wait_ready "http://localhost:8001/health" "SGLang($tag)"; then
+  SVR_PID=$!; local svr=$SVR_PID
+  if wait_ready "http://localhost:8001/health" "SGLang($tag)" "$LOGS/sglang-$tag.log"; then
     # generated-shared-prefix exercises RadixAttention directly
     python -m sglang.bench_serving --backend sglang --host 127.0.0.1 --port 8001 \
       --model "$MODEL" --dataset-name generated-shared-prefix \
